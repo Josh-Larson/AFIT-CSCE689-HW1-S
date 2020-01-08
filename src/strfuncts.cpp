@@ -41,4 +41,3 @@ int hideInput(int fd, bool hide) {
       return -1; 
    return 0;
 }
-

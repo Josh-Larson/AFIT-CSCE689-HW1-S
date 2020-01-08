@@ -1,3 +1,5 @@
+#pragma once
+
 #include <string>
 
 // Remove /r and /n from a string
@@ -11,5 +13,3 @@ void lower(std::string &str);
 
 // Turns off local echo from a user's terminal
 int hideInput(int fd, bool hide);
-
-

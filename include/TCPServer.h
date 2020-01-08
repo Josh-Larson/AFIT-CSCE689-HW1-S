@@ -1,23 +1,13 @@
-#ifndef TCPSERVER_H
-#define TCPSERVER_H
+#pragma once
 
 #include "Server.h"
 
-class TCPServer : public Server 
-{
-public:
-   TCPServer();
-   ~TCPServer();
-
-   void bindSvr(const char *ip_addr, unsigned short port);
-   void listenSvr();
-   void shutdown();
-
-private:
- 
-
-
+class TCPServer : public Server {
+	public:
+	TCPServer();
+	~TCPServer() override;
+	
+	void bindSvr(const char *ip_addr, unsigned short port) override;
+	void listenSvr() override;
+	void shutdown() override;
 };
-
-
-#endif

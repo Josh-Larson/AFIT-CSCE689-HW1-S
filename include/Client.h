@@ -1,5 +1,4 @@
-#ifndef CLIENT_H
-#define CLIENT_H
+#pragma once
 
 /******************************************************************************************
  * Client - Parent class for student's TCP client 
@@ -20,27 +19,21 @@
  *
  *****************************************************************************************/
 
-class Client { 
-   public:
-      virtual ~Client();
-
-      // Overload me!
-      virtual void connectTo(const char *ip_addr, unsigned short port) = 0;
-
-      // Overload me!
-      virtual void handleConnection() = 0;
-
-      // Overload me!
-      virtual void closeConn() = 0;
-
-   protected:
-
-      // Do not forget, your constructor should call this constructor (always a good habit)
-      Client();
-
-   private:
- 
-      // Stuff to be left alone
+class Client {
+	public:
+	virtual ~Client();
+	
+	// Overload me!
+	virtual void connectTo(const char *ip_addr, unsigned short port) = 0;
+	
+	// Overload me!
+	virtual void handleConnection() = 0;
+	
+	// Overload me!
+	virtual void closeConn() = 0;
+	
+	protected:
+	
+	// Do not forget, your constructor should call this constructor (always a good habit)
+	Client();
 };
-
-#endif

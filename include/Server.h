@@ -1,5 +1,4 @@
-#ifndef SERVER_H
-#define SERVER_H
+#pragma once
 
 /******************************************************************************************
  * Server - Parent class for student's TCP server
@@ -17,26 +16,19 @@
  *
  *****************************************************************************************/
 
-class Server { 
-   public:
-      virtual ~Server();
-
-      // Overload me!
-      virtual void bindSvr(const char *ip_addr, unsigned short port) = 0;
-      virtual void listenSvr() = 0;
-
-      // if you overload, don't forget to call me
-      virtual void shutdown() = 0;
-
-   protected:
-
-      // Do not forget, your constructor should call this constructor
-      Server();
-
-   private:
- 
-
-      // Stuff to be left alone
+class Server {
+	public:
+	virtual ~Server();
+	
+	// Overload me!
+	virtual void bindSvr(const char *ip_addr, unsigned short port) = 0;
+	virtual void listenSvr() = 0;
+	
+	// if you overload, don't forget to call me
+	virtual void shutdown() = 0;
+	
+	protected:
+	
+	// Do not forget, your constructor should call this constructor
+	Server();
 };
-
-#endif
