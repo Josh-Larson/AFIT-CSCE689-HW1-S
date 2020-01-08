@@ -18,7 +18,6 @@ TCPServer::~TCPServer() {
 
 void TCPServer::bindSvr(const char *ip_addr, short unsigned int port) {
 
-   
 }
 
 /**********************************************************************************************
