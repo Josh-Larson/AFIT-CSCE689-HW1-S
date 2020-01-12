@@ -79,8 +79,8 @@ class FD {
 		f.fd = -1;
 	}
 	FD<T>& operator=(FD<T> && f) {
-//		if (fd >= 0)
-//			closeHandler(fd);
+		if (fd >= 0)
+			closeHandler(fd);
 		fd = f.fd;
 		readHandler = std::move(f.readHandler);
 		writeHandler = std::move(f.writeHandler);
@@ -208,7 +208,7 @@ class Selector {
 					if (fdIt != fds.end()) {
 						try {
 							fdIt->doRead();
-							// Unfortunately need to find it again, due to the possibility that fdObj changed
+							// Unfortunately need to find it again, due to the possibility that fdIt changed
 							fdIt = std::find_if(fds.begin(), fds.end(), [fd](const auto & a) { return a.getFD() == fd; });
 							if (fdIt != fds.end() && fdIt->isReadReady())
 								readCallback(fd, fdIt->getData(), fdIt->getReadBuffer());
