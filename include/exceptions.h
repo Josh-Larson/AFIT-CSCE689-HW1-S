@@ -1,3 +1,5 @@
+#pragma once
+
 #include <stdexcept>
 
 // Designed to be used for an error binding or opening a network connection, etc
