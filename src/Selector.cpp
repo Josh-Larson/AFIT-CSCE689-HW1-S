@@ -6,6 +6,21 @@
 #include <cstring>
 #include <utility>
 
+Buffer::Buffer(const std::string& str) :
+	mData(new uint8_t[str.length()]), mOffset(0), mLength(str.length()) {
+		memcpy(this->mData, reinterpret_cast<const uint8_t*>(&str[0]), str.length());
+}
+
+Buffer::Buffer(const void *data, size_t length) :
+		mData(new uint8_t[length]), mOffset(0), mLength(length) {
+	memcpy(this->mData, data, length);
+}
+
+Buffer::Buffer(const char *data, size_t offset, size_t length) :
+		mData(new uint8_t[length]), mOffset(0), mLength(length) {
+	memcpy(this->mData, data + offset, length);
+}
+
 Buffer::Buffer(const uint8_t *data, size_t offset, size_t length) :
 		mData(new uint8_t[length]), mOffset(0), mLength(length) {
 	memcpy(this->mData, data + offset, length);
@@ -22,14 +37,20 @@ std::pair<size_t, const uint8_t *> DynamicBuffer::getNextChunk() const {
 }
 
 void DynamicBuffer::advanceBuffer(size_t count) {
-	assert(currentBuffer != nullptr);
-	if (currentBuffer != nullptr)
-		currentBuffer->advance(count);
-	if (currentBuffer->length() == 0)
-		currentBuffer = currentBuffer->nextBuffer();
+	auto buffer = currentBuffer;
+	while (count > 0 && buffer != nullptr) {
+		count = buffer->advance(count);
+		if (count > 0)
+			buffer = buffer->nextBuffer();
+	}
+	while (buffer != nullptr && buffer->length() == 0)
+		buffer = buffer->nextBuffer();
+	currentBuffer = buffer;
 }
 
 void DynamicBuffer::addBuffer(std::shared_ptr<Buffer> buffer) {
+	if (buffer->length() == 0)
+		return;
 	if (currentBuffer == nullptr) {
 		currentBuffer = std::move(buffer);
 		lastBuffer = currentBuffer;
@@ -37,7 +58,15 @@ void DynamicBuffer::addBuffer(std::shared_ptr<Buffer> buffer) {
 		auto lastBufferLocked = this->lastBuffer.lock();
 		assert(lastBufferLocked != nullptr);
 		assert(lastBufferLocked->nextBuffer() == nullptr);
-		lastBufferLocked->nextBuffer() = buffer;
+		lastBufferLocked->nextBuffer(buffer);
+		lastBuffer = buffer;
+	}
+}
+
+void DynamicBuffer::addBuffer(DynamicBuffer buffer) {
+	while (buffer.currentBuffer != nullptr) {
+		addBuffer(buffer.currentBuffer);
+		buffer.currentBuffer = buffer.currentBuffer->nextBuffer();
 	}
 }
 

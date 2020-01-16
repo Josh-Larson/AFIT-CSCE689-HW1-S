@@ -2,9 +2,12 @@
 
 #include "Server.h"
 #include "Selector.h"
+#include <NetworkMessage.h>
 
 class TCPServer : public Server {
-	Selector<void> selector;
+	using StoredDataType = void;
+	using StoredDataPointer = const std::shared_ptr<StoredDataType>&;
+	Selector<StoredDataType> selector;
 	
 	public:
 	TCPServer();
@@ -15,5 +18,16 @@ class TCPServer : public Server {
 	void shutdown() final;
 	
 	private:
-	void onRead(int fd, const std::shared_ptr<void>& data, DynamicBuffer buffer);
+	static std::string createGreeting();
+	static std::string createMenu();
+	
+	void onRead(int fd, StoredDataPointer data, DynamicBuffer & buffer);
+	
+	void onReadHelloRequest(int fd, StoredDataPointer data, HelloMessage msg);
+	void onReadGeneric1Request(int fd, StoredDataPointer data, Generic1Message msg);
+	void onReadGeneric2Request(int fd, StoredDataPointer data, Generic2Message msg);
+	void onReadGeneric3Request(int fd, StoredDataPointer data, Generic3Message msg);
+	void onReadGeneric4Request(int fd, StoredDataPointer data, Generic4Message msg);
+	void onReadGeneric5Request(int fd, StoredDataPointer data, Generic5Message msg);
+	void onReadMenuRequest(int fd, StoredDataPointer data, MenuMessage msg);
 };

@@ -1,19 +1,24 @@
 #pragma once
 
 #include <string>
-#include "Client.h"
-
-// The amount to read in before we send a packet
-const unsigned int stdin_bufsize = 50;
-const unsigned int socket_bufsize = 100;
+#include <Client.h>
+#include <Selector.h>
 
 class TCPClient : public Client {
+	Selector<void> selector;
+	int fd;
+	
 	public:
 	TCPClient();
-	~TCPClient();
+	~TCPClient() override = default;
 	
-	virtual void connectTo(const char *ip_addr, unsigned short port);
-	virtual void handleConnection();
+	void connectTo(const char *ip_addr, unsigned short port) override;
+	void handleConnection() override;
 	
-	virtual void closeConn();
+	void closeConn() override;
+	
+	private:
+	void onRead(int fd, const std::shared_ptr<void>& data, DynamicBuffer & buffer);
+	
+	void handleUserInput(std::string input);
 };
