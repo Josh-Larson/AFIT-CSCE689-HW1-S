@@ -48,7 +48,7 @@ class Buffer {
 };
 
 class DynamicBuffer {
-	std::list<std::shared_ptr<Buffer>> buffers;
+	std::list<std::shared_ptr<Buffer>> buffers{};
 	
 	public:
 	DynamicBuffer() = default;
@@ -92,9 +92,9 @@ class FD {
 	std::function<std::shared_ptr<Buffer>(int)> readHandler = &FD::defaultRead;
 	std::function<ssize_t(int, const uint8_t *, size_t)> writeHandler = &FD::defaultWrite;
 	std::function<void(int)> closeHandler = &FD::defaultClose;
-	DynamicBuffer readBuffer;
-	DynamicBuffer writeBuffer;
-	std::shared_ptr<T> data;
+	DynamicBuffer readBuffer  = {};
+	DynamicBuffer writeBuffer = {};
+	std::shared_ptr<T> data   = nullptr;
 	
 	public:
 	explicit FD(int fd, std::shared_ptr<T> data) : fd(fd), data(std::move(data)) {}

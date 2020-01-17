@@ -20,6 +20,8 @@ struct Message {
 	
 	Message() = default;
 	Message(uint16_t size, MessageType type) : size(size), type(type) {}
+	
+	virtual const uint8_t * data() { return reinterpret_cast<const uint8_t *>(this); }
 };
 
 struct HelloMessage : public Message {

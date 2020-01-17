@@ -153,6 +153,6 @@ void TCPClient::handleUserInput(std::string input) {
 		return;
 	}
 	if (message != nullptr) {
-		selector.writeToFD(fd, std::make_shared<Buffer>(message.get(), message->size));
+		selector.writeToFD(fd, std::make_shared<Buffer>(message->data(), message->size));
 	}
 }
