@@ -11,6 +11,7 @@ AC_CONFIG_MACRO_DIR([m4])
 # Checks for programs.
 AC_PROG_CXX
 AC_PROG_CC
+CXXFLAGS=-std=c++17
 
 # Checks for header files.
 AC_CHECK_HEADERS([arpa/inet.h fcntl.h netinet/in.h stdlib.h string.h strings.h sys/socket.h termios.h unistd.h])
