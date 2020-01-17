@@ -105,7 +105,7 @@ void TCPServer::shutdown() {
 
 void TCPServer::onRead(int fd, StoredDataPointer data, DynamicBuffer & buffer) {
 	Message message{};
-	if (buffer.peekNext(&message, sizeof(Message))) {
+	while (buffer.peekNext(&message, sizeof(Message))) {
 		fprintf(stdout, "Received message: %d\n", static_cast<int>(message.type));
 		switch (message.type) {
 			case MessageType::HELLO:     HANDLE_MESSAGE(onReadHelloRequest,    HelloMessage) break;

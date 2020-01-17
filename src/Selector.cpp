@@ -31,63 +31,58 @@ Buffer::~Buffer() {
 }
 
 std::pair<size_t, const uint8_t *> DynamicBuffer::getNextChunk() const {
-	if (currentBuffer == nullptr)
+	if (buffers.empty())
 		return {0, nullptr};
-	return {currentBuffer->length(), currentBuffer->data()};
+	const auto & buf = buffers.front();
+	return {buf->length(), buf->data()};
 }
 
 void DynamicBuffer::advanceBuffer(size_t count) {
-	auto buffer = currentBuffer;
-	while (count > 0 && buffer != nullptr) {
-		count = buffer->advance(count);
+	while (count > 0 && !buffers.empty()) {
+		if (count == 0)
+			break;
+		auto & front = buffers.front();
+		count = front->advance(count);
 		if (count > 0)
-			buffer = buffer->nextBuffer();
+			buffers.pop_front();
 	}
-	while (buffer != nullptr && buffer->length() == 0)
-		buffer = buffer->nextBuffer();
-	currentBuffer = buffer;
+	while (!buffers.empty() && buffers.front()->length() == 0)
+		buffers.pop_front();
 }
 
-void DynamicBuffer::addBuffer(std::shared_ptr<Buffer> buffer) {
-	if (buffer->length() == 0)
-		return;
-	if (currentBuffer == nullptr) {
-		currentBuffer = std::move(buffer);
-		lastBuffer = currentBuffer;
-	} else {
-		auto lastBufferLocked = this->lastBuffer.lock();
-		assert(lastBufferLocked != nullptr);
-		assert(lastBufferLocked->nextBuffer() == nullptr);
-		lastBufferLocked->nextBuffer(buffer);
-		lastBuffer = buffer;
-	}
+void DynamicBuffer::addBuffer(const std::shared_ptr<Buffer>& buffer) {
+	buffers.emplace_back(buffer);
 }
 
-void DynamicBuffer::addBuffer(DynamicBuffer buffer) {
-	while (buffer.currentBuffer != nullptr) {
-		addBuffer(buffer.currentBuffer);
-		buffer.currentBuffer = buffer.currentBuffer->nextBuffer();
+void DynamicBuffer::addBuffer(DynamicBuffer& buffer) {
+	while (!buffer.buffers.empty()) {
+		buffers.emplace_back(buffer.buffers.front());
+		buffer.buffers.pop_front();
 	}
 }
 
 bool DynamicBuffer::peekNext(void *dst, size_t length) {
 	// Determine if we have enough data to do the transfer
 	size_t availableData = 0;
-	for (auto it = currentBuffer; it != nullptr && availableData < length; it = it->nextBuffer()) {
-		availableData += it->length();
+	for (const auto & buf : buffers) {
+		availableData += buf->length();
+		if (availableData >= length)
+			break;
 	}
 	if (availableData < length)
 		return false;
 	
 	// Transfer
 	size_t transferred = 0;
-	for (auto it = currentBuffer; it != nullptr && transferred < length; it = it->nextBuffer()) {
-		availableData += it->length();
+	for (const auto & buf : buffers) {
 		size_t transferRemaining = length - transferred;
-		auto [chunkRemaining, chunkData] = getNextChunk();
-		auto chunkTransfer = std::min(transferRemaining, chunkRemaining);
+		const auto chunkRemaining = buf->length();
+		const auto chunkData = buf->data();
+		const auto chunkTransfer = std::min(transferRemaining, chunkRemaining);
 		memcpy(static_cast<uint8_t*>(dst)+transferred, chunkData, chunkTransfer);
 		transferred += chunkTransfer;
+		if (transferred >= length)
+			break;
 	}
 	assert(transferred == length);
 	return true;
@@ -96,8 +91,10 @@ bool DynamicBuffer::peekNext(void *dst, size_t length) {
 bool DynamicBuffer::getNext(void *dst, size_t length) {
 	// Determine if we have enough data to do the transfer
 	size_t availableData = 0;
-	for (auto it = currentBuffer; it != nullptr && availableData < length; it = it->nextBuffer()) {
-		availableData += it->length();
+	for (const auto & buf : buffers) {
+		availableData += buf->length();
+		if (availableData >= length)
+			break;
 	}
 	if (availableData < length)
 		return false;

@@ -53,7 +53,7 @@ void TCPClient::connectTo(const char *ip_addr, unsigned short port) {
 	// Load stdin
 	flags = fcntl(STDIN_FILENO, F_GETFL, 0);
 	fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK);
-	selector.addFD(FD<void>(STDIN_FILENO, nullptr, std::nullopt, [this](int fd, uint8_t * data, size_t len){return ::write(STDOUT_FILENO, data, len);}, [](auto fd){}));
+	selector.addFD(FD<void>(STDIN_FILENO, nullptr, std::nullopt, [this](int fd, const uint8_t * data, size_t len){return ::write(STDOUT_FILENO, data, len);}, [](auto fd){}));
 }
 
 /**********************************************************************************************
@@ -95,30 +95,35 @@ void TCPClient::onRead(int fd, const std::shared_ptr<void> &data, DynamicBuffer 
 		selector.writeToFD(STDIN_FILENO, buffer);
 		return;
 	}
-	// Load string from input buffer
-	ssize_t newline = -1;
-	do {
-		while (buffer.length() > 0 && (buffer[0] == '\r' || buffer[0] == '\n'))
-			buffer.advanceBuffer(1);
-		const auto maxLength = buffer.length();
-		for (size_t i = 0; i < maxLength; i++) {
-			if (buffer[i] == '\r' || buffer[i] == '\n') {
-				newline = i;
-				break;
+	while (true) {
+		// Load string from input buffer
+		ssize_t newline = -1;
+		do {
+			while (buffer.length() > 0 && (buffer[0] == '\r' || buffer[0] == '\n'))
+				buffer.advanceBuffer(1);
+			const auto maxLength = buffer.length();
+			if (buffer.length() == 0)
+				return;
+			for (size_t i = 0; i < maxLength; i++) {
+				if (buffer[i] == '\r' || buffer[i] == '\n') {
+					newline = i;
+					break;
+				}
 			}
-		}
-	} while (newline == 0);
-	
-	// Copy string to something we can process
-	if (newline < 0)
-		return;
-	assert(newline > 0);
-	char * input = new char[newline+1];
-	auto successfulRead = buffer.getNext(input, newline);
-	assert(successfulRead); // Must mean a concurrency issue
-	input[newline] = 0;
-	
-	handleUserInput(std::string(input));
+		} while (newline == 0);
+		
+		// Copy string to something we can process
+		if (newline < 0)
+			return;
+		assert(newline > 0);
+		std::vector<char> input;
+		input.resize(newline+1);
+		auto successfulRead = buffer.getNext(&input.front(), newline);
+		assert(successfulRead); // Must mean a concurrency issue
+		input[newline] = 0;
+		
+		handleUserInput(std::string(&input.front(), 0, newline));
+	}
 }
 
 void TCPClient::handleUserInput(std::string input) {
