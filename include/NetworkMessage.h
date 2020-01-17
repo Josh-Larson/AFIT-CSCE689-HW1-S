@@ -1,7 +1,10 @@
 #pragma once
 
+#include <Selector.h>
+
 #include <cstdint>
 #include <cassert>
+#include <memory>
 
 enum class MessageType : uint8_t {
 	UNKNOWN     = 0,
@@ -21,7 +24,28 @@ struct Message {
 	Message() = default;
 	Message(uint16_t size, MessageType type) : size(size), type(type) {}
 	
-	virtual const uint8_t * data() { return reinterpret_cast<const uint8_t *>(this); }
+	virtual bool peek(const DynamicBuffer & buffer) {
+		if (buffer.length() < 3)
+			return false;
+		const auto buf = buffer.getNextBuffer();
+		size = *reinterpret_cast<const uint16_t*>(buf->data());
+		type = static_cast<MessageType>(buf->get(2));
+		return true;
+	}
+	
+	virtual bool get(DynamicBuffer & buffer) {
+		bool success = peek(buffer);
+		if (success)
+			buffer.advanceBuffer(3);
+		return success;
+	}
+	
+	virtual std::shared_ptr<Buffer> encode() {
+		std::array<BufferByte, 3> encoded {};
+		*reinterpret_cast<uint16_t*>(encoded.data()) = size;
+		encoded[2] = static_cast<uint8_t>(type);
+		return std::make_shared<Buffer>(encoded.data(), 3);
+	}
 };
 
 struct HelloMessage : public Message {

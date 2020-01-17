@@ -53,7 +53,7 @@ void TCPClient::connectTo(const char *ip_addr, unsigned short port) {
 	// Load stdin
 	flags = fcntl(STDIN_FILENO, F_GETFL, 0);
 	fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK);
-	selector.addFD(FD<void>(STDIN_FILENO, nullptr, std::nullopt, [this](int fd, const uint8_t * data, size_t len){return ::write(STDOUT_FILENO, data, len);}, [](auto fd){}));
+	selector.addFD(FD<void>(STDIN_FILENO, nullptr, std::nullopt, [this](int fd, const BufferByte * data, size_t len){return ::write(STDOUT_FILENO, data, len);}, [](auto fd){}));
 }
 
 /**********************************************************************************************
@@ -116,13 +116,10 @@ void TCPClient::onRead(int fd, const std::shared_ptr<void> &data, DynamicBuffer 
 		if (newline < 0)
 			return;
 		assert(newline > 0);
-		std::vector<char> input;
-		input.resize(newline+1);
-		auto successfulRead = buffer.getNext(&input.front(), newline);
-		assert(successfulRead); // Must mean a concurrency issue
-		input[newline] = 0;
 		
-		handleUserInput(std::string(&input.front(), 0, newline));
+		Buffer input = buffer.getNext(newline+1);
+		static_assert(sizeof(int8_t) == sizeof(char), "Not a one-to-one conversion from int8_t to char");
+		handleUserInput(std::string(reinterpret_cast<const char*>(input.data()), newline));
 	}
 }
 
@@ -153,6 +150,6 @@ void TCPClient::handleUserInput(std::string input) {
 		return;
 	}
 	if (message != nullptr) {
-		selector.writeToFD(fd, std::make_shared<Buffer>(message->data(), message->size));
+		selector.writeToFD(fd, message->encode());
 	}
 }

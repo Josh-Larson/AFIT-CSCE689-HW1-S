@@ -99,13 +99,13 @@ void TCPServer::shutdown() {
 /* Not ideal.. but works for the time being */
 #define HANDLE_MESSAGE(FUNCTION, MESSAGE_TYPE)  {\
                                                     MESSAGE_TYPE msg;\
-                                                    if (buffer.getNext(&msg, sizeof(MESSAGE_TYPE))) \
+                                                    if (msg.get(buffer)) \
                                                         FUNCTION(fd, data, msg); \
                                                 }
 
 void TCPServer::onRead(int fd, StoredDataPointer data, DynamicBuffer & buffer) {
 	Message message{};
-	while (buffer.peekNext(&message, sizeof(Message))) {
+	while (message.peek(buffer)) {
 		fprintf(stdout, "Received message: %d\n", static_cast<int>(message.type));
 		switch (message.type) {
 			case MessageType::HELLO:     HANDLE_MESSAGE(onReadHelloRequest,    HelloMessage) break;

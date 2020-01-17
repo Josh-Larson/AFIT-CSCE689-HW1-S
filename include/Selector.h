@@ -19,19 +19,20 @@
 #include <vector>
 #include <list>
 
+using BufferByte = int8_t;
+
 class Buffer {
-	uint8_t * mData   = nullptr;
-	size_t    mLength = 0;
-	size_t    mOffset = 0;
+	std::unique_ptr<BufferByte[]> mData = nullptr;
+	size_t mLength = 0;
+	size_t mOffset = 0;
 	
 	public:
 	explicit Buffer(const std::string& str);
 	Buffer(const void *data, size_t length);
-	Buffer(const char *data, size_t offset, size_t length);
-	Buffer(const uint8_t * data, size_t offset, size_t length);
-	~Buffer();
+	Buffer(std::unique_ptr<BufferByte[]> data, size_t length);
+	~Buffer() = default;
 	
-	[[nodiscard]] inline const uint8_t * data() const { assert(mOffset <= mLength); return mData + mOffset; }
+	[[nodiscard]] inline const BufferByte * data() const { assert(mOffset <= mLength); return mData.get() + mOffset; }
 	[[nodiscard]] inline size_t length() const { assert(mOffset <= mLength); return mLength - mOffset; }
 	
 	ssize_t advance(size_t offset) {
@@ -45,6 +46,16 @@ class Buffer {
 		mOffset = newOffset;
 		return 0;
 	}
+	
+	[[nodiscard]] inline BufferByte get(size_t i) const noexcept {
+		assert(i >= 0);
+		assert(mOffset + i < mLength);
+		return mData.get()[mOffset+i];
+	}
+	
+	inline BufferByte operator[](size_t i) const noexcept {
+		return get(i);
+	}
 };
 
 class DynamicBuffer {
@@ -54,43 +65,46 @@ class DynamicBuffer {
 	DynamicBuffer() = default;
 	~DynamicBuffer() = default;
 	
-	[[nodiscard]] std::pair<size_t, const uint8_t*> getNextChunk() const;
+	std::shared_ptr<Buffer> getNextBuffer() const { assert(!buffers.empty()); return buffers.front(); }
 	void advanceBuffer(size_t count);
 	void addBuffer(const std::shared_ptr<Buffer>&);
 	void addBuffer(DynamicBuffer&);
-	[[nodiscard]] inline bool isDataReady() const { return !buffers.empty(); }
+	[[nodiscard]] inline bool isDataReady() const noexcept { return !buffers.empty(); }
 	
-	size_t length() noexcept {
+	[[nodiscard]] size_t length() const noexcept {
 		size_t len = 0;
 		for (const auto& buf : buffers) {
+			assert(buf->length() > 0); // Should have been cleaned up
 			len += buf->length();
 		}
 		return len;
 	}
-	uint8_t operator[](size_t i) {
-		if (buffers.empty())
-			throw std::runtime_error("Array Index Out Of Bounds!");
+	
+	BufferByte operator[](size_t i) const noexcept {
+		assert(!buffers.empty());
 		
 		size_t len = 0;
 		for (const auto& buf : buffers) {
+			assert(buf->length() > 0); // Should have been cleaned up
 			auto prevLen = len;
 			len += buf->length();
 			if (len > i)
-				return buf->data()[i - prevLen];
+				return buf->get(i - prevLen);
 		}
-		
-		throw std::runtime_error("Array Index Out Of Bounds!");
+		assert(false); // Ran off end of buffer
+		return 0xAF;   // Odd return value that should indicate we screwed up
 	}
 	
 	bool peekNext(void * dst, size_t length);
 	bool getNext(void * dst, size_t length);
+	Buffer getNext(size_t length);
 };
 
 template<typename T>
 class FD {
 	int fd = -1;
 	std::function<std::shared_ptr<Buffer>(int)> readHandler = &FD::defaultRead;
-	std::function<ssize_t(int, const uint8_t *, size_t)> writeHandler = &FD::defaultWrite;
+	std::function<ssize_t(int, const BufferByte *, size_t)> writeHandler = &FD::defaultWrite;
 	std::function<void(int)> closeHandler = &FD::defaultClose;
 	DynamicBuffer readBuffer  = {};
 	DynamicBuffer writeBuffer = {};
@@ -98,7 +112,7 @@ class FD {
 	
 	public:
 	explicit FD(int fd, std::shared_ptr<T> data) : fd(fd), data(std::move(data)) {}
-	FD(int fd, std::shared_ptr<T> data, std::optional<std::function<std::shared_ptr<Buffer>(int)>> readHandler, std::optional<std::function<ssize_t(int, const uint8_t *, size_t)>> writeHandler, std::optional<std::function<void(int)>> closeHandler) :
+	FD(int fd, std::shared_ptr<T> data, std::optional<std::function<std::shared_ptr<Buffer>(int)>> readHandler, std::optional<std::function<ssize_t(int, const BufferByte *, size_t)>> writeHandler, std::optional<std::function<void(int)>> closeHandler) :
 			fd(fd), data(data),
 			readHandler(readHandler.has_value() ? std::move(*readHandler) : &FD::defaultRead),
 			writeHandler(writeHandler.has_value() ? std::move(*writeHandler) : &FD::defaultWrite),
@@ -140,10 +154,10 @@ class FD {
 	void doWrite() {
 		ssize_t written;
 		do {
-			auto [chunkRemaining, chunkData] = writeBuffer.getNextChunk();
-			if (chunkRemaining <= 0)
+			if (!writeBuffer.isDataReady())
 				return;
-			written = writeHandler(fd, chunkData, chunkRemaining);
+			auto buffer = writeBuffer.getNextBuffer();
+			written = writeHandler(fd, buffer->data(), buffer->length());
 			if (written > 0)
 				writeBuffer.advanceBuffer(written);
 			else if (written < 0 && !(errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR))
@@ -159,14 +173,14 @@ class FD {
 	
 	private:
 	static std::shared_ptr<Buffer> defaultRead(int fd) {
-		std::array<uint8_t, 1024> readBuffer{};
+		std::array<BufferByte, 1024> readBuffer{};
 		auto n = read(fd, readBuffer.data(), readBuffer.size());
 		if (n <= 0)
 			throw socket_error("connection closed");
-		return std::make_unique<Buffer>(readBuffer.data(), 0, static_cast<size_t>(n));
+		return std::make_unique<Buffer>(readBuffer.data(), static_cast<size_t>(n));
 	}
 	
-	static ssize_t defaultWrite(int fd, const uint8_t * data, size_t length) {
+	static ssize_t defaultWrite(int fd, const BufferByte * data, size_t length) {
 		return ::write(fd, data, length);
 	}
 	
@@ -212,7 +226,7 @@ class Selector {
 	inline void addFD(int fd) { fds.emplace_back(std::make_shared<FD<T>>(fd, nullptr)); }
 	
 	void writeToFD(int fd, std::shared_ptr<Buffer> buffer) {
-		runIfFDFound(fd, [buffer](FDPTR it) {
+		runIfFDFound(fd, [&buffer](FDPTR it) {
 			it->getWriteBuffer().addBuffer(buffer);
 		});
 	}
@@ -365,7 +379,7 @@ class Selector {
 		return *it;
 	}
 	
-	inline void runIfFDFound(int fd, std::function<void(FDPTR)> handler) {
+	inline void runIfFDFound(int fd, const std::function<void(FDPTR)> & handler) {
 		auto it = std::find_if(std::cbegin(fds), std::cend(fds), [fd](const auto & a) { return a->getFD() == fd; });
 		if (it != std::cend(fds))
 			handler(*it);
